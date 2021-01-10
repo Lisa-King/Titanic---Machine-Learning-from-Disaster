@@ -75,10 +75,13 @@ Parch_df.groupby('Parch').sum()[['Survive_R', 'Died_R']].plot(kind='bar', stacke
 #Ticket fare
 plt.hist([df_train[df_train['Survived'] == 1]['Fare'], df_train[df_train['Survived'] == 0]['Fare']], stacked=True, color = ['g','r'], bins = 50, label = ['Survived','Died'])
 plt.legend()
+plt.show()
 
-#Before we move futher, let's chech the correlation between input features
+#Before we move futher, let's check the correlation between input features
 df_train.groupby('Pclass').mean()['Fare'].plot(kind='bar')
+plt.show()
 df_train.groupby('Pclass').mean()['Age'].plot(kind='bar')
+plt.show90
 
 #Ok, now we have got a general idea about our datasets. It is time to do feature engineering and selection
 # reading test data
@@ -87,6 +90,11 @@ df_test = pd.read_csv('test.csv')
 # extracting and then removing the targets from the training data
 targets = df_train['Survived']
 df_train.drop(['Survived'], 1, inplace=True)
+
+#process cabin first for test dataset
+df_test['Cabin'].fillna('Missing', inplace=True)
+df_test['Cabin'] = df_test['Cabin'].map(lambda x: x[0])
+df_test['Cabin'].unique()
 
 # merging train data and test data for future feature engineering
 # we'll also remove the PassengerID since this is not an informative feature
@@ -205,12 +213,14 @@ print(test_cabin)
 
 #Now let's fill out the missing values for Cabin
 combined['Cabin'].fillna('M', inplace=True)
-combined['Cabin'] = combined['Cabin'].map(lambda c: c[0])
+combined['Cabin'] = combined['Cabin'].map(lambda x: x[0])
+combined['Cabin'].unique()
 
 # dummy encoding ...
 cabin_dummies = pd.get_dummies(combined['Cabin'], prefix='Cabin')
 combined = pd.concat([combined, cabin_dummies], axis=1)
 combined.drop('Cabin', axis=1, inplace=True)
+print(combined.columns)
 
 #For now, check missing data
 combined.isnull().sum()
@@ -235,6 +245,7 @@ combined['FamilySize'] = combined['Parch'] + combined['SibSp'] + 1
 combined['Single'] = combined['FamilySize'].map(lambda s: 1 if s == 1 else 0)
 combined['SmallFamily'] = combined['FamilySize'].map(lambda s: 1 if 2 <= s <= 4 else 0)
 combined['LargeFamily'] = combined['FamilySize'].map(lambda s: 1 if 5 <= s else 0)
+print(combined.cloumns)
 
 #a function that extracts each prefix of the ticket, returns 'NONE' if no prefix (i.e the ticket is a digit)
 def cleanTicket(ticket):
@@ -381,8 +392,3 @@ test = pd.read_csv('test.csv')
 submit['PassengerId'] = test['PassengerId']
 submit['Survived'] = df_test_preds
 submit.to_csv('Titanic_LR_15_20200624.csv', index=False)
-
-
-
-
-
