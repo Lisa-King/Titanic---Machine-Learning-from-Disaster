@@ -81,20 +81,45 @@ plt.show()
 df_train.groupby('Pclass').mean()['Fare'].plot(kind='bar')
 plt.show()
 df_train.groupby('Pclass').mean()['Age'].plot(kind='bar')
-plt.show90
+plt.show()
 
 #Ok, now we have got a general idea about our datasets. It is time to do feature engineering and selection
 # reading test data
 df_test = pd.read_csv('test.csv')
 
-# extracting and then removing the targets from the training data
-targets = df_train['Survived']
-df_train.drop(['Survived'], 1, inplace=True)
+##########################################################################################################################################
+#do the same data engineering process for test dataset as train dataset done before!
+#Fill in the missing age with median age number
+df_test['Age'] = df_test['Age'].fillna(df_test['Age'].median())
 
-#process cabin first for test dataset
+#Only 2 Embarked is missing. Let's remove these two rows
+df_test['Embarked'].unique()
+df_test=df_test[df_test['Embarked'].notna()]
+
+#Another way is to replace these two with the most frequent one 'S'
+df_test['Embarked'].value_counts().plot(kind='bar')
+plt.show()
+df_test['Embarked'].fillna('S', inplace=True)
+
+#Convert categorical variable into dummy/indicator variables.
+embarked_dummies_test = pd.get_dummies(df_test['Embarked'], prefix='Embarked')
+df_test = pd.concat([df_test, embarked_dummies_test], axis=1)
+df_test.drop('Embarked', axis=1, inplace=True)
+print(df_test.columns)
+
+#There are too many missing values in Cabin, instead of removing this variable, we use 'Missing' to replace it
 df_test['Cabin'].fillna('Missing', inplace=True)
+
+#Also, the cabin contains numbers, but we care more about the Cabin class, so we will remove numbers.
+# mapping each Cabin value with the cabin letter
 df_test['Cabin'] = df_test['Cabin'].map(lambda x: x[0])
 df_test['Cabin'].unique()
+
+##########################################################################################################################################
+# extracting and then removing the targets from the training data
+targets = df_train['Survived']
+
+df_train.drop(['Survived'], 1, inplace=True)
 
 # merging train data and test data for future feature engineering
 # we'll also remove the PassengerID since this is not an informative feature
@@ -245,7 +270,7 @@ combined['FamilySize'] = combined['Parch'] + combined['SibSp'] + 1
 combined['Single'] = combined['FamilySize'].map(lambda s: 1 if s == 1 else 0)
 combined['SmallFamily'] = combined['FamilySize'].map(lambda s: 1 if 2 <= s <= 4 else 0)
 combined['LargeFamily'] = combined['FamilySize'].map(lambda s: 1 if 5 <= s else 0)
-print(combined.cloumns)
+print(combined.columns)
 
 #a function that extracts each prefix of the ticket, returns 'NONE' if no prefix (i.e the ticket is a digit)
 def cleanTicket(ticket):
@@ -271,7 +296,7 @@ combined.drop('Ticket', inplace=True, axis=1)
 print(combined.shape)
 
 #Prepare the training dataset
-df_im_input=combined.iloc[:891]
+df_im_input=combined.iloc[:889]
 df_im_output=targets
 
 #Now let's get the importance of each feature
@@ -336,7 +361,7 @@ print("AUC: %2.3f" % auc(fpr, tpr))
 conf_m=confusion_matrix(targets, preds)
 
 #get the test input and predictions
-df_test_input_final=combined.iloc[891:][top_10_feature['feature']]
+df_test_input_final=combined.iloc[889:][top_10_feature['feature']]
 df_test_preds=logreg.predict(df_test_input_final)
 
 #output the results to a csv file
@@ -344,7 +369,7 @@ submit = pd.DataFrame()
 test = pd.read_csv('test.csv')
 submit['PassengerId'] = test['PassengerId']
 submit['Survived'] = df_test_preds
-submit.to_csv('Titanic_LR_20200624.csv', index=False)
+submit.to_csv('Titanic_LR_1.csv', index=False)
 
 
 #15 features
@@ -383,7 +408,7 @@ print("AUC: %2.3f" % auc(fpr, tpr))
 conf_m=confusion_matrix(targets, preds)
 
 #get the test input and predictions
-df_test_input_final=combined.iloc[891:][top_15_feature['feature']]
+df_test_input_final=combined.iloc[889:][top_15_feature['feature']]
 df_test_preds=logreg.predict(df_test_input_final)
 
 #output the results to a csv file
@@ -391,4 +416,57 @@ submit = pd.DataFrame()
 test = pd.read_csv('test.csv')
 submit['PassengerId'] = test['PassengerId']
 submit['Survived'] = df_test_preds
-submit.to_csv('Titanic_LR_15_20200624.csv', index=False)
+submit.to_csv('Titanic_LR_15.csv', index=False)
+
+#8 features
+#select top 8 important features
+top_8_feature=features.nlargest(8, 'importance')
+df_input_final=df_im_input[top_8_feature['feature']]
+
+#build Logistic Regression Model
+logreg = LogisticRegression()
+logreg.fit(df_input_final,targets)
+
+#get predictions based on training input
+preds=logreg.predict(df_input_final)
+preds_probabilities = logreg.predict_proba(df_input_final)
+pred_probs = preds_probabilities[:, 1]
+
+[fpr, tpr, thr] = roc_curve(targets, pred_probs)
+
+#plot ROC curve
+plt.figure(figsize=(10, 6), dpi=80)
+plt.plot(fpr, tpr, color='coral', label='ROC curve (area = %0.3f)' % auc(fpr, tpr))
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate (FPR)', fontsize=14)
+plt.ylabel('True Positive Rate (TPR)', fontsize=14)
+plt.title('Receiver operating characteristic (ROC) curve')
+plt.legend(loc="lower right")
+plt.show()
+
+#check model accuracy on training dataset
+from sklearn.metrics import confusion_matrix, accuracy_score
+print("accuracy: %2.3f" % accuracy_score(targets, preds))
+print("AUC: %2.3f" % auc(fpr, tpr))
+
+conf_m=confusion_matrix(targets, preds)
+
+#get the test input and predictions
+df_test_input_final=combined.iloc[889:][top_8_feature['feature']]
+df_test_preds=logreg.predict(df_test_input_final)
+
+#output the results to a csv file
+submit = pd.DataFrame()
+test = pd.read_csv('test.csv')
+submit['PassengerId'] = test['PassengerId']
+submit['Survived'] = df_test_preds
+submit.to_csv('Titanic_LR_8.csv', index=False)
+
+
+
+
+
+
+
